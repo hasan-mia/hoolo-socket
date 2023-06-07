@@ -15,7 +15,7 @@ app.use(express.static("public"));
 const server = http.createServer(app);
 
 // Port
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5001;
 
 // ===================================//
 //      setup socket IO Server        //
@@ -29,6 +29,8 @@ const io = socketIO(server, {
 
 // ==========user controls function==========
 let onlineUsers = [];
+// Object to store offline notifications
+const offlineNotifications = {};
 // add user
 const addNewUser = (useruuid, userName, socketId) => {
   const existingUser = onlineUsers?.find((user) => user?.useruuid === useruuid);
@@ -48,9 +50,13 @@ const getUser = (useruuid) => {
 // ======connect from socket-client=========
 
 io.on("connection", (socket) => {
-  console.log("A user connected");
-  socket.on("newUser", ({ useruuid, userName }) => {
-    addNewUser(useruuid, userName, socket.id);
+  const socketId = socket.id;
+
+  console.log(socketId + " is connected");
+
+  socket.on("newUser", ({ userUuid, userName }) => {
+    addNewUser(userUuid, userName, socketId);
+    io.emit("socketUser", { userUuid, userName, socketId });
   });
 
   // ====live notification =====
@@ -65,27 +71,42 @@ io.on("connection", (socket) => {
       notification,
     }) => {
       const receiver = getUser(receiverUuid);
-      // send data to client
-      io.to(receiver?.socketId).emit({
-        uuid,
-        senderUuid,
-        senderName,
-        notification,
-        receiverName,
-      });
+      // Check if the user is currently online
+      if (io.sockets.connected[socketId]) {
+        // User is online, emit the comment directly
+        io.to(receiver?.socketId).emit("sendNotification", {
+          uuid,
+          senderUuid,
+          senderName,
+          notification,
+          receiverName,
+        });
+      } else {
+        // User is offline, save the notification for later
+        if (!offlineNotifications[userId]) {
+          offlineNotifications[userId] = [];
+        }
+        offlineNotifications[userId].push({
+          uuid,
+          senderUuid,
+          senderName,
+          notification,
+          receiverName,
+        });
+      }
     }
   );
 
   // ====live feed comment of a post=====
   socket.on(
     "sendComment",
-    ({ uuid, feeduuid, useruuid, commenterName, comment }) => {
+    ({ uuid, feeduuid, userUuid, commenterName, commentData }) => {
       io.emit("getComment", {
         uuid,
-        useruuid,
+        userUuid,
         feeduuid,
         commenterName,
-        comment,
+        commentData,
       });
     }
   );

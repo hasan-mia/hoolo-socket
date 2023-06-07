@@ -40,7 +40,7 @@ const addNewUser = (useruuid, userName, socketId) => {
 const removeUser = (socketId) => {
   onlineUsers = onlineUsers?.filter((user) => user?.socketId !== socketId);
 };
-// get user by email
+// get user by useruuid
 const getUser = (useruuid) => {
   return onlineUsers?.find((user) => user?.useruuid === useruuid);
 };

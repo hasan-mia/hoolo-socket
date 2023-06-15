@@ -15,7 +15,7 @@ app.use(express.static("public"));
 const server = http.createServer(app);
 
 // Port
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5001;
 
 // ===================================//
 //      setup socket IO Server        //
@@ -47,19 +47,26 @@ const getUser = (useruuid) => {
   return onlineUsers?.find((user) => user?.useruuid === useruuid);
 };
 
-// ======connect from socket-client=========
+// one to one video calling room
+const rooms = {};
+
+// ===============================
+//  Connect from socket-client  //
+//================================
 
 io.on("connection", (socket) => {
   const socketId = socket.id;
 
   console.log(socketId + " is connected");
+  // =======================================
+  //  Live notification for specific user //
+  // =======================================
 
   socket.on("newUser", ({ userUuid, userName }) => {
     addNewUser(userUuid, userName, socketId);
     io.emit("socketUser", { userUuid, userName, socketId });
   });
 
-  // ====live notification =====
   socket.on(
     "sendNotification",
     ({
@@ -97,28 +104,10 @@ io.on("connection", (socket) => {
     }
   );
 
-  // comment_uuid: socket?.id,
-  //           parent_uuid: uuid,
-  //           user_info: {
-  //               name: userInfo?.user_info?.full_name || userInfo?.phone,
-  //               username: userInfo?.user_info?.user_name || userInfo?.phone,
-  //               email: userInfo?.email || null,
-  //               img:
-  //                   userInfo?.user_info?.profile?.path ||
-  //                   `https://img.icons8.com/?size=512&id=108296&format=png`,
-  //           },
-  //           feed_uuid: feedId,
-  //           user_uuid: userInfo?.user_uuid,
-  //           commenterName: userInfo?.user_info?.full_name
-  //               ? userInfo?.user_info?.full_name
-  //               : userInfo?.phone
-  //               ? userInfo?.phone
-  //               : 'Anonymous',
-  //           commentData,
-  //           times: new Date(),
-  //           likes: [],
+  // =====================================
+  //    Live feed comment of a post     //
+  // =====================================
 
-  // ====live feed comment of a post=====
   socket.on(
     "sendComment",
     ({
@@ -146,10 +135,68 @@ io.on("connection", (socket) => {
     }
   );
 
-  // ======disconnect from socket=========
+  // =====================================
+  //       One to One Video Calling     //
+  // =====================================
+  socket.on("join-room", ({ roomID, userName, userImg }) => {
+    // else create a new room
+    if (rooms[roomID] === undefined) {
+      rooms[roomID] = [{ id: socketId, userName, userImg }];
+    }
+    if (rooms[roomID] !== undefined) {
+      const existingUser = rooms[roomID]?.find((user) => user.id === socketId);
+      if (!existingUser) {
+        rooms[roomID].push({ id: socketId, userName, userImg });
+      }
+    }
+
+    // finding the user - see if id is of the user in room exist
+    const user = rooms[roomID].find((user) => user.id !== socketId);
+    if (user) {
+      socket.emit("old-user", { userId: user.id, userName, userImg });
+      // if someone new user has joined then we get the id of the other user
+      socket
+        .to(user.id)
+        .emit("new-user", { newUserId: socketId, userName, userImg });
+    }
+  });
+
+  // creating an offer and send the event to other user
+  socket.on("offer", (payload) => {
+    io.to(payload.target).emit("offer", payload);
+  });
+
+  // answering the call and sending it back to the original user
+  socket.on("answer", (payload) => {
+    io.to(payload.target).emit("answer", payload);
+  });
+
+  // finding the path with ice-candidate
+  socket.on("ice-candidate", (incoming) => {
+    io.to(incoming.target).emit("ice-candidate", incoming.candidate);
+  });
+
+  // =====================================
+  //    Disconnected users controll     //
+  // =====================================
+
   socket.on("disconnect", () => {
     console.log("A user disconnected");
+    // remove user from notification room
     removeUser(socket.id);
+    // remove user form room if disconnect
+    for (const roomID in rooms) {
+      const room = rooms[roomID];
+      const index = room.findIndex((user) => user.id === socketId);
+      if (index !== -1) {
+        room.splice(index, 1);
+        const otherUser = room[0];
+        if (otherUser) {
+          socket.to(otherUser.id).emit("user left");
+        }
+        break; // Assuming a user can only be in one room, exit the loop after finding the room.
+      }
+    }
   });
 });
 

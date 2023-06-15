@@ -97,17 +97,51 @@ io.on("connection", (socket) => {
     }
   );
 
+  // comment_uuid: socket?.id,
+  //           parent_uuid: uuid,
+  //           user_info: {
+  //               name: userInfo?.user_info?.full_name || userInfo?.phone,
+  //               username: userInfo?.user_info?.user_name || userInfo?.phone,
+  //               email: userInfo?.email || null,
+  //               img:
+  //                   userInfo?.user_info?.profile?.path ||
+  //                   `https://img.icons8.com/?size=512&id=108296&format=png`,
+  //           },
+  //           feed_uuid: feedId,
+  //           user_uuid: userInfo?.user_uuid,
+  //           commenterName: userInfo?.user_info?.full_name
+  //               ? userInfo?.user_info?.full_name
+  //               : userInfo?.phone
+  //               ? userInfo?.phone
+  //               : 'Anonymous',
+  //           commentData,
+  //           times: new Date(),
+  //           likes: [],
+
   // ====live feed comment of a post=====
   socket.on(
     "sendComment",
-    ({ profilePic, feeduuid, userUuid, commenterName, commentData, time }) => {
+    ({
+      comment_uuid,
+      parent_uuid,
+      user_info,
+      feed_uuid,
+      user_uuid,
+      name,
+      comment,
+      times,
+      likes,
+    }) => {
       io.emit("getComment", {
-        profilePic,
-        userUuid,
-        feeduuid,
-        commenterName,
-        commentData,
-        time,
+        comment_uuid,
+        parent_uuid,
+        user_info,
+        feed_uuid,
+        user_uuid,
+        name,
+        comment,
+        times,
+        likes,
       });
     }
   );

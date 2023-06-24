@@ -15,7 +15,7 @@ app.use(express.static("public"));
 const server = http.createServer(app);
 
 // Port
-const port = process.env.PORT || 5001;
+const port = process.env.PORT || 5000;
 
 // ===================================//
 //      setup socket IO Server        //
@@ -111,7 +111,7 @@ io.on("connection", (socket) => {
   socket.on(
     "sendComment",
     ({
-      comment_uuid,
+      uuid,
       parent_uuid,
       user_info,
       feed_uuid,
@@ -122,7 +122,7 @@ io.on("connection", (socket) => {
       likes,
     }) => {
       io.emit("getComment", {
-        comment_uuid,
+        uuid,
         parent_uuid,
         user_info,
         feed_uuid,
